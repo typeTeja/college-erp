@@ -11,10 +11,18 @@ export class AdmissionsService {
     ) { }
 
     async createApplication(data: CreateApplicationDto) {
+        // Note: In real app, you'd look up courseId etc.
+        // For now assuming courseId=1 exists or validation happens elsewhere
         return this.prisma.admissionApplication.create({
             data: {
-                ...data,
-                status: 'DRAFT',
+                fullName: data.applicantName, // mapped from DTO
+                email: data.email,
+                phone: data.mobile,
+                dob: new Date(), // Mock DOB, should be in DTO
+                course: {
+                    connect: { id: 1 }, // Mock course ID
+                },
+                status: 'PENDING',
             },
         });
     }

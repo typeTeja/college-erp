@@ -1,204 +1,570 @@
+// ---------------------
+// DATABASE & GENERATOR
+// ---------------------
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
 
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  PRINCIPAL
-  HOD
-  FACULTY
-  STUDENT
-  PARENT
-  EXAM_CELL
-  WARDEN
-  LIBRARIAN
-  ACCOUNTANT
-}
+// ---------------------
+// GLOBAL MODELS
+// ---------------------
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  phone       String?   @unique
+  password    String
+  role        Role      @relation(fields: [roleId], references: [id])
+  roleId      Int
+  isActive    Boolean   @default(true)
+
+  student     Student?
+  faculty     Faculty?
+  notifications Notification[] // Added relation
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Role {
+  id       Int      @id @default(autoincrement())
+  name     String    @unique
+  permissions Json?
+
+  users    User[]
+}
+
+
+// ---------------------
+// ADMISSIONS MODULE
+// ---------------------
+
+model AdmissionApplication {
+  id              Int       @id @default(autoincrement())
+  fullName        String
+  dob             DateTime
+  phone           String
+  email           String
+  courseId        Int
+  status          AdmissionStatus @default(PENDING)
+  paymentStatus   PaymentStatus   @default(PENDING)
+  easebuzzRef     String?  
+  documents       Json?
+
+  scholarship     Int?      
+  omrSheetUrl     String?
+  entranceScore   Float?    // Added missing field
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  course          Course   @relation(fields: [courseId], references: [id])
+}
+
+enum AdmissionStatus {
+  PENDING
+  VERIFIED
+  TENTATIVE
+  CONFIRMED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+
+// ---------------------
+// STUDENT MASTER
+// ---------------------
+
+model Student {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  admissionNumber   String   @unique
+  courseId          Int
+  semesterId        Int
+  sectionId         Int?
+
+  parentName        String?
+  parentPhone       String?
+  address           String?
+
+  documents         Json?    // Aadhaar, PAN, TC, migration, originals
+  profilePhotoUrl   String?
   
-  // Relations
-  studentProfile Student?
-  facultyProfile Faculty?
-  adminProfile   Admin?
+  aadhaarNumber     String?  @unique // Added for uniqueness check
+  panNumber         String?  // Added missing field
+
+  status            StudentStatus @default(ACTIVE)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id])
+  course            Course   @relation(fields: [courseId], references: [id])
+  semester          Semester @relation(fields: [semesterId], references: [id])
+  section           Section? @relation(fields: [sectionId], references: [id])
+
+  attendanceRecords AttendanceRecord[]
+  examMarks         ExamMark[]
+  fees              FeeTransaction[]
+  hostel            HostelAllocation?
+  libraryLogs       LibraryLog[]
+  odcRecords        OdcRecord[]
+  placements        PlacementApplication[]
+  issues            StudentIssue[]
 }
 
-model Admin {
-  id     Int  @id @default(autoincrement())
-  userId Int  @unique
-  user   User @relation(fields: [userId], references: [id])
+enum StudentStatus {
+  ACTIVE
+  DETAINED
+  PASSOUT
+  DROPPED
+  ALUMNI
 }
 
-// Old Student model removed. See below for new definition.
 
+// ---------------------
+// ACADEMIC STRUCTURE
+// ---------------------
+
+model Course {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  years    Int
+  
+  admissions AdmissionApplication[] // Added relation
+  students   Student[]
+  yearsRel   CourseYear[]
+  fees       FeeStructure[] // Added relation
+}
+
+model CourseYear {
+  id        Int        @id @default(autoincrement())
+  courseId  Int
+  year      Int
+
+  course    Course     @relation(fields: [courseId], references: [id])
+  semesters Semester[]
+}
+
+model Semester {
+  id        Int       @id @default(autoincrement())
+  courseYearId Int
+  name      String
+
+  courseYear CourseYear @relation(fields: [courseYearId], references: [id])
+  subjects   Subject[]
+  students   Student[]
+  sections   Section[]
+  exams      Exam[] // Added relation
+}
+
+model Section {
+  id          Int       @id @default(autoincrement())
+  name        String
+  semesterId  Int
+
+  semester    Semester  @relation(fields: [semesterId], references: [id])
+  students    Student[]
+  timetable   TimetableSlot[] // Added relation
+}
+
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  type        SubjectType
+  semesterId  Int
+
+  weeklyHours Int?
+  totalHours  Int?
+
+  semester    Semester @relation(fields: [semesterId], references: [id])
+  timetable   TimetableSlot[]
+  lessons     LessonPlan[]
+  questions   QuestionBank[]
+  examMarks   ExamMark[] // Added relation
+}
+
+enum SubjectType {
+  THEORY
+  PRACTICAL
+  ELECTIVE
+  AUDIT
+}
+
+
+// ---------------------
+// LESSON PLAN
+// ---------------------
+
+model LessonPlan {
+  id         Int     @id @default(autoincrement())
+  subjectId  Int
+  unit       Int
+  topic      String
+  subtopics  Json?
+  hours      Int?
+  status     String? // Added status (Pending/Completed)
+
+  assignments Assignment[]
+
+  subject    Subject @relation(fields: [subjectId], references: [id])
+}
+
+model Assignment {
+  id          Int     @id @default(autoincrement())
+  lessonPlanId Int
+  title       String
+  type        AssignmentType
+  maxMarks    Int
+  dueDate     DateTime?
+
+  lessonPlan  LessonPlan @relation(fields: [lessonPlanId], references: [id])
+}
+
+enum AssignmentType {
+  WRITTEN
+  CASE_STUDY
+  PRESENTATION
+  PROJECT
+}
+
+
+// ---------------------
+// TIMETABLE
+// ---------------------
+
+model TimetableSlot {
+  id          Int      @id @default(autoincrement())
+  subjectId   Int
+  facultyId   Int
+  sectionId   Int?
+  dayOfWeek   Int
+  startTime   String
+  endTime     String
+
+  subject     Subject   @relation(fields: [subjectId], references: [id])
+  faculty     Faculty   @relation(fields: [facultyId], references: [id])
+  section     Section?  @relation(fields: [sectionId], references: [id])
+
+  attendance  AttendanceRecord[]
+}
+
+
+// ---------------------
+// FACULTY + LEAVE
+// ---------------------
 
 model Faculty {
   id           Int      @id @default(autoincrement())
   userId       Int      @unique
-  user         User     @relation(fields: [userId], references: [id])
-  employeeId   String   @unique
-  firstName    String
-  lastName     String
-  designation  String
-  departmentId Int?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  department   String?
+  qualification String?
+  workload      Json?
+  employeeId    String? @unique // Added missing field
+
+  leaves        FacultyLeave[]
+  substitutions FacultyLeave[] @relation("Substitute") // Added missing relation
+  timetable     TimetableSlot[]
+
+  user          User    @relation(fields: [userId], references: [id])
 }
 
-enum ApplicationStatus {
-  DRAFT
-  SUBMITTED
-  PAYMENT_PENDING
-  PAYMENT_COMPLETED
-  DOCUMENT_VERIFIED
-  ADMITTED
+model FacultyLeave {
+  id          Int        @id @default(autoincrement())
+  facultyId   Int
+  type        LeaveType
+  status      LeaveStatus @default(PENDING)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  
+  substituteId Int?      // Added missing field
+  substitute   Faculty?  @relation("Substitute", fields: [substituteId], references: [id])
+
+  faculty     Faculty @relation(fields: [facultyId], references: [id])
+}
+
+enum LeaveType {
+  CL
+  SL
+  EL
+  LOP
+  COMP_OFF
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
   REJECTED
 }
 
-model AdmissionApplication {
-  id              Int               @id @default(autoincrement())
-  applicationNo   String            @unique @default(uuid())
-  applicantName   String
-  email           String
-  mobile          String
-  courseApplied   String
-  status          ApplicationStatus @default(DRAFT)
-  
-  // Payment
-  paymentId       String?           // Easebuzz ID
-  paymentStatus   String?
-  amount          Float?
 
-  // Documents
-  photoUrl        String?
-  aadhaarUrl      String?
-  panUrl          String?
-  certificateUrl  String?
+// ---------------------
+// ATTENDANCE
+// ---------------------
 
-  // Entrance
-  entranceExamId  Int?
-  entranceScore   Float?
-  
-  userId          Int?              // Linked after admission
-  
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+model AttendanceRecord {
+  id              Int       @id @default(autoincrement())
+  studentId       Int
+  timetableSlotId Int
+  date            DateTime
+  status          AttendanceStatus
+
+  student         Student       @relation(fields: [studentId], references: [id])
+  timetableSlot   TimetableSlot @relation(fields: [timetableSlotId], references: [id])
 }
 
-// --- Student Master Module ---
-
-enum StudentStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-  ALUMNI
-  DROPOUT
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  OD
+  LEAVE
+  LATE
 }
 
-model Student {
-  id             Int           @id @default(autoincrement())
-  userId         Int           @unique
-  user           User          @relation(fields: [userId], references: [id])
-  
-  // Admission Details
-  admissionNo    String        @unique
-  rollNo         String?       @unique
-  admissionDate  DateTime      @default(now())
-  status         StudentStatus @default(ACTIVE)
 
-  // Personal Details
-  firstName      String
-  lastName       String
-  dateOfBirth    DateTime
-  gender         String
-  bloodGroup     String?
-  religion       String?
-  caste          String?
-  nationality    String?
-  aadhaarNo      String?       @unique
-  panNo          String?
-  
-  // Contact
-  mobile         String
-  email          String?
-  address        String?
-  city           String?
-  state          String?
-  pincode        String?
+// ---------------------
+// EXAMS + QUESTION BANK
+// ---------------------
 
-  // Academic Info
-  batchYear      Int
-  currentSem     Int           @default(1)
-  section        String? 
-  courseId       Int?
-  
-  // Relations
-  parents        ParentDetails?
-  documents      StudentDocument[]
-  attendance     Attendance[]
-  
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+model Exam {
+  id         Int      @id @default(autoincrement())
+  name       String
+  type       ExamType
+  date       DateTime
+  semesterId Int
+
+  semester   Semester @relation(fields: [semesterId], references: [id])
+  marks      ExamMark[]
 }
 
-model ParentDetails {
-  id             Int      @id @default(autoincrement())
-  studentId      Int      @unique
-  student        Student  @relation(fields: [studentId], references: [id])
-  
-  fatherName     String
-  fatherMobile   String
-  fatherOccupation String?
-  
-  motherName     String
-  motherMobile   String?
-  motherOccupation String?
-  
-  guardianName   String?
-  guardianMobile String?
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+enum ExamType {
+  MID1
+  MID2
+  FINAL
+  REEXAM
 }
 
-model StudentDocument {
-  id             Int      @id @default(autoincrement())
-  studentId      Int
-  student        Student  @relation(fields: [studentId], references: [id])
-  
-  documentName   String
-  documentType   String   // e.g. AADHAAR, PAN, TC
-  fileUrl        String
-  isOriginal     Boolean  @default(false)
-  isVerified     Boolean  @default(false)
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model ExamMark {
+  id         Int     @id @default(autoincrement())
+  examId     Int
+  studentId  Int
+  subjectId  Int
+  marks      Int?
+
+  exam       Exam     @relation(fields: [examId], references: [id])
+  student    Student  @relation(fields: [studentId], references: [id])
+  subject    Subject  @relation(fields: [subjectId], references: [id])
 }
 
-model Attendance {
-  id             Int      @id @default(autoincrement())
-  studentId      Int
-  student        Student  @relation(fields: [studentId], references: [id])
+model QuestionBank {
+  id          Int     @id @default(autoincrement())
+  subjectId   Int
+  question    String
+  type        QuestionType
+  difficulty  Difficulty
+  metadata    Json?
+
+  subject     Subject @relation(fields: [subjectId], references: [id])
+}
+
+enum QuestionType {
+  MCQ
+  SHORT
+  LONG
+  CASE_STUDY
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+
+// ---------------------
+// FEES & FINANCE
+// ---------------------
+
+model FeeStructure {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  year      Int
+  amount    Int
+  installments Json? // Added missing field [DueDate, Amount]
+
+  course    Course   @relation(fields: [courseId], references: [id])
+}
+
+model FeeTransaction {
+  id          Int       @id @default(autoincrement())
+  studentId   Int
+  amount      Int
+  status      PaymentStatus
+  easebuzzRef String?
+  paidAt      DateTime?
+  type        String    @default("TUITION") // Added missing field
+
+  student     Student @relation(fields: [studentId], references: [id])
+}
+
+
+// ---------------------
+// HOSTEL
+// ---------------------
+
+model HostelAllocation {
+  id         Int      @id @default(autoincrement())
+  studentId  Int      @unique
+  roomNo     String?
+  bedNo      String?
+  startDate  DateTime?
   
-  date           DateTime
-  status         String   // PRESENT, ABSENT, LATE, OD
-  period         Int?     // NULL for daily attendance, Int for subject-wise
-  subjectId      Int?
+  fees       Int?     // Added missing field
+  isVacated  Boolean  @default(false) // Added missing field
+
+  student    Student @relation(fields: [studentId], references: [id])
+}
+
+
+// ---------------------
+// LIBRARY
+// ---------------------
+
+model LibraryBook {
+  id         Int      @id @default(autoincrement())
+  title      String
+  author     String?
+  isbn       String?
+  copies     Int      @default(1)
+
+  logs       LibraryLog[]
+}
+
+model LibraryLog {
+  id         Int      @id @default(autoincrement())
+  studentId  Int
+  bookId     Int
+  issuedAt   DateTime @default(now())
+  returnedAt DateTime?
+  fineAmount Int?     // Added missing field
+
+  student    Student     @relation(fields: [studentId], references: [id])
+  book       LibraryBook @relation(fields: [bookId], references: [id])
+}
+
+
+// ---------------------
+// ODC MODULE
+// ---------------------
+
+model OdcRecord {
+  id         Int      @id @default(autoincrement())
+  studentId  Int
+  hotelName  String
+  date       DateTime
+  amount     Int?
+  status     String?  // Added missing field
+
+  student    Student @relation(fields: [studentId], references: [id])
+}
+
+
+// ---------------------
+// PLACEMENTS
+// ---------------------
+
+model PlacementDrive {
+  id           Int      @id @default(autoincrement())
+  company      String
+  role         String
+  date         DateTime
+  package      Float?   // Added missing field (LPA)
+
+  applications PlacementApplication[]
+}
+
+model PlacementApplication {
+  id         Int      @id @default(autoincrement())
+  driveId    Int
+  studentId  Int
+  status     PlacementStatus @default(APPLIED)
+
+  drive      PlacementDrive @relation(fields: [driveId], references: [id])
+  student    Student        @relation(fields: [studentId], references: [id])
+}
+
+enum PlacementStatus {
+  APPLIED
+  SHORTLISTED
+  SELECTED
+  REJECTED
+}
+
+
+// ---------------------
+// STUDENT MONITORING (L1/L2/L3)
+// ---------------------
+
+model StudentIssue {
+  id         Int         @id @default(autoincrement())
+  studentId  Int
+  level      IssueLevel
+  remarks    String?
+  resolved   Boolean      @default(false) // Added missing field
+  createdAt  DateTime     @default(now())
+
+  student    Student      @relation(fields: [studentId], references: [id])
+}
+
+enum IssueLevel {
+  L1
+  L2
+  L3
+}
+
+// ---------------------
+// NOTIFICATIONS
+// ---------------------
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  status    NotificationStatus @default(UNREAD)
   
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  metadata  Json?    // { entityId: 1, entityType: 'FEE' }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  REMINDER
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
 }

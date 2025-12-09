@@ -36,12 +36,14 @@ export class StudentsService {
         const student = await this.prisma.student.findUnique({
             where: { id },
             include: {
-                parents: true,
-                documents: true,
-                attendance: {
+                user: true,
+                course: true,
+                fees: true,
+                attendanceRecords: {
                     take: 5,
                     orderBy: { date: 'desc' },
                 },
+                examMarks: true,
             },
         });
         if (!student) throw new NotFoundException(`Student with ID ${id} not found`);
