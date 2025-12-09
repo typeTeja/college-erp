@@ -1,0 +1,204 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  PRINCIPAL
+  HOD
+  FACULTY
+  STUDENT
+  PARENT
+  EXAM_CELL
+  WARDEN
+  LIBRARIAN
+  ACCOUNTANT
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  studentProfile Student?
+  facultyProfile Faculty?
+  adminProfile   Admin?
+}
+
+model Admin {
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id])
+}
+
+// Old Student model removed. See below for new definition.
+
+
+model Faculty {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  user         User     @relation(fields: [userId], references: [id])
+  employeeId   String   @unique
+  firstName    String
+  lastName     String
+  designation  String
+  departmentId Int?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  PAYMENT_PENDING
+  PAYMENT_COMPLETED
+  DOCUMENT_VERIFIED
+  ADMITTED
+  REJECTED
+}
+
+model AdmissionApplication {
+  id              Int               @id @default(autoincrement())
+  applicationNo   String            @unique @default(uuid())
+  applicantName   String
+  email           String
+  mobile          String
+  courseApplied   String
+  status          ApplicationStatus @default(DRAFT)
+  
+  // Payment
+  paymentId       String?           // Easebuzz ID
+  paymentStatus   String?
+  amount          Float?
+
+  // Documents
+  photoUrl        String?
+  aadhaarUrl      String?
+  panUrl          String?
+  certificateUrl  String?
+
+  // Entrance
+  entranceExamId  Int?
+  entranceScore   Float?
+  
+  userId          Int?              // Linked after admission
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+// --- Student Master Module ---
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ALUMNI
+  DROPOUT
+}
+
+model Student {
+  id             Int           @id @default(autoincrement())
+  userId         Int           @unique
+  user           User          @relation(fields: [userId], references: [id])
+  
+  // Admission Details
+  admissionNo    String        @unique
+  rollNo         String?       @unique
+  admissionDate  DateTime      @default(now())
+  status         StudentStatus @default(ACTIVE)
+
+  // Personal Details
+  firstName      String
+  lastName       String
+  dateOfBirth    DateTime
+  gender         String
+  bloodGroup     String?
+  religion       String?
+  caste          String?
+  nationality    String?
+  aadhaarNo      String?       @unique
+  panNo          String?
+  
+  // Contact
+  mobile         String
+  email          String?
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+
+  // Academic Info
+  batchYear      Int
+  currentSem     Int           @default(1)
+  section        String? 
+  courseId       Int?
+  
+  // Relations
+  parents        ParentDetails?
+  documents      StudentDocument[]
+  attendance     Attendance[]
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model ParentDetails {
+  id             Int      @id @default(autoincrement())
+  studentId      Int      @unique
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  fatherName     String
+  fatherMobile   String
+  fatherOccupation String?
+  
+  motherName     String
+  motherMobile   String?
+  motherOccupation String?
+  
+  guardianName   String?
+  guardianMobile String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model StudentDocument {
+  id             Int      @id @default(autoincrement())
+  studentId      Int
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  documentName   String
+  documentType   String   // e.g. AADHAAR, PAN, TC
+  fileUrl        String
+  isOriginal     Boolean  @default(false)
+  isVerified     Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Attendance {
+  id             Int      @id @default(autoincrement())
+  studentId      Int
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  date           DateTime
+  status         String   // PRESENT, ABSENT, LATE, OD
+  period         Int?     // NULL for daily attendance, Int for subject-wise
+  subjectId      Int?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

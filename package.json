@@ -1,0 +1,23 @@
+{
+    "name": "college-erp-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev:api": "npm run dev --workspace=@college-erp/api",
+        "dev:web": "npm run dev --workspace=@college-erp/web",
+        "build": "npm run build --workspaces",
+        "test": "npm run test --workspaces",
+        "db:generate": "npx prisma generate --schema=apps/api/prisma/schema.prisma",
+        "db:migrate": "npx prisma migrate dev --schema=apps/api/prisma/schema.prisma"
+    },
+    "devDependencies": {
+        "eslint": "latest",
+        "prettier": "latest",
+        "turbo": "latest",
+        "typescript": "latest"
+    }
+}
