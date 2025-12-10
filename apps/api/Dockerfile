@@ -1,17 +1,50 @@
-FROM node:18-alpine As development
+# Production Dockerfile for NestJS API
+FROM node:22-alpine AS base
 
-WORKDIR /usr/src/app
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
 
-COPY --chown=node:node package*.json ./
-COPY --chown=node:node apps/api/package*.json ./apps/api/
-COPY --chown=node:node packages/config/package*.json ./packages/config/
+# Copy package files
+COPY package.json package-lock.json* ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/config/package.json ./packages/config/
 
-RUN npm install
+# Install dependencies
+RUN npm ci
 
-COPY --chown=node:node . .
+# Build the application
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-USER node
+# Generate Prisma Client
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
 
-WORKDIR /usr/src/app/apps/api
+# Build the API
+RUN npm run build --workspace=@college-erp/api
 
-CMD [ "npm", "run", "dev" ]
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nestjs
+
+# Copy necessary files
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./package.json
+
+USER nestjs
+
+EXPOSE 3001
+
+ENV PORT=3001
+
+CMD ["node", "dist/main"]
