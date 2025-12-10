@@ -1,27 +1,22 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import QueryProvider from '@/providers/query-provider'
-
-const inter = Inter({ subsets: ['latin'] })
+import type { Metadata } from "next";
+import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-    title: 'College ERP',
-    description: 'Enterprise Resource Planning System for Colleges',
-}
+    title: "College ERP",
+    description: "College Management System",
+};
 
 export default function RootLayout({
     children,
-}: {
-    children: React.ReactNode
-}) {
+}: Readonly<{
+    children: React.ReactNode;
+}>) {
     return (
         <html lang="en">
-            <body className={inter.className}>
-                <QueryProvider>
-                    {children}
-                </QueryProvider>
+            <body>
+                <Providers>{children}</Providers>
             </body>
         </html>
-    )
+    );
 }

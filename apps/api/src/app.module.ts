@@ -6,6 +6,7 @@ import { StorageModule } from './common/storage.module';
 import { QueueModule } from './common/queue.module';
 import { AdmissionsModule } from './modules/admissions/admissions.module';
 import { StudentsModule } from './modules/students/students.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { StudentsModule } from './modules/students/students.module';
         QueueModule,
         AdmissionsModule,
         StudentsModule,
+        DashboardModule,
     ],
     controllers: [],
     providers: [],

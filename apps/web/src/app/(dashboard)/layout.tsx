@@ -1,25 +1,43 @@
+'use client';
+import { useAuthStore } from '@/store/use-auth-store';
+import { useRouter } from 'next/navigation';
+
 export default function DashboardLayout({
     children,
 }: {
-    children: React.ReactNode
+    children: React.ReactNode;
 }) {
+    const logout = useAuthStore((state) => state.logout);
+    const router = useRouter();
+
     return (
-        <div className="flex h-screen w-full flex-col">
-            <header className="border-b px-6 py-4">
-                <h1 className="text-xl font-bold">College ERP</h1>
-            </header>
-            <div className="flex flex-1">
-                <aside className="w-64 border-r p-4 hidden md:block">
-                    <nav className="space-y-2">
-                        <a href="/admissions" className="block p-2 hover:bg-slate-100 rounded">Admissions</a>
-                        <a href="/students" className="block p-2 hover:bg-slate-100 rounded">Students</a>
-                        <a href="/academics" className="block p-2 hover:bg-slate-100 rounded">Academics</a>
-                    </nav>
-                </aside>
-                <main className="flex-1 p-6 overflow-auto">
+        <div className="min-h-screen bg-gray-100">
+            {/* Top Sidebar / Nav placeholder */}
+            <nav className="bg-white shadow">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex h-16 justify-between">
+                        <div className="flex">
+                            <div className="flex flex-shrink-0 items-center">
+                                <span className="font-bold text-xl text-indigo-600">College ERP</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => logout()}
+                                className="ml-3 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <main>
+                <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
                     {children}
-                </main>
-            </div>
+                </div>
+            </main>
         </div>
-    )
+    );
 }

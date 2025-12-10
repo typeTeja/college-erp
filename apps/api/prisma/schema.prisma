@@ -20,24 +20,74 @@ model User {
   email       String    @unique
   phone       String?   @unique
   password    String
-  role        Role      @relation(fields: [roleId], references: [id])
-  roleId      Int
   isActive    Boolean   @default(true)
+  lastLoginAt DateTime? 
+
+  roles       UserRole[]
+  refreshTokens RefreshToken[]
+  otps        Otp[]
 
   student     Student?
   faculty     Faculty?
-  notifications Notification[] // Added relation
+  notifications Notification[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
 
 model Role {
-  id       Int      @id @default(autoincrement())
-  name     String    @unique
-  permissions Json?
+  id          Int       @id @default(autoincrement())
+  name        String    @unique // e.g., SUPER_ADMIN, ADMIN, STUDENT, PARENT
+  permissions Json?     // { "module": ["READ", "WRITE"] }
+  
+  users       UserRole[]
+}
 
-  users    User[]
+model UserRole {
+  userId      Int
+  roleId      Int
+  assignedAt  DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RefreshToken {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  isRevoked   Boolean  @default(false)
+  deviceInfo  String?
+  ipAddress   String?
+  
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Otp {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     // Nullable because some OTPs might be pre-registration (e.g. valid mobile check) or focused on mobile number
+  mobile      String
+  code        String
+  type        OtpType  @default(LOGIN)
+  expiresAt   DateTime
+  isUsed      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([mobile])
+}
+
+enum OtpType {
+  LOGIN
+  PASSWORD_RESET
+  VERIFICATION
 }
 
 
